@@ -26,6 +26,7 @@ package com.nirima.jenkins.repo.build;
 import hudson.maven.MavenBuild;
 import hudson.maven.reporters.MavenArtifact;
 import hudson.model.Run;
+import org.apache.jackrabbit.webdav.version.report.LatestActivityVersionReport;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -120,15 +121,39 @@ public class MetadataRepositoryItem extends TextRepositoryItem {
             }
         }
 
+        Run latestBuild = null;
+
         for(Entry e : entryToBuild.values())
         {
             e.getSnapshotXml(buf);
+            latestBuild = updateLatest(e, latestBuild);
         }
 
         buf.append("    </snapshotVersions>\n");
+
+        if (latestBuild != null) {
+            buf.append("    <snapshot>");
+            buf.append("        <timestamp>").append(_vfmt.format(latestBuild.getTime())).append("</timestamp>");
+            buf.append("        <buildNumber>").append(latestBuild.getNumber()).append("</buildNumber>");
+            buf.append("    </snapshot>");
+            buf.append("    <lastUpdated>").append(_ufmt.format(latestBuild.getTime())).append("</lastUpdated>");
+        }
         buf.append("  </versioning>\n");
         buf.append("</metadata>\n");
         return buf.toString();
+    }
+
+    private Run updateLatest(Entry e, Run latestBuild) {
+        final MavenBuild build = e.theItem.getBuild();
+        if (latestBuild == null) {
+            return build;
+        } else if  (build.getTime().after(latestBuild.getTime())) {
+            return build;
+        } else if (build.getTime().equals(latestBuild.getTime()) &&
+                   build.getNumber() > latestBuild.getNumber()) {
+            return build;
+        }
+        return latestBuild;
     }
 
     class Entry {
